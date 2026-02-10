@@ -1,0 +1,66 @@
+mainmenu "ALFS Configuration"
+
+menu "System Information"
+
+choice
+    prompt "LFS Book Version"
+    default LFS_12_4_SYSV
+    help
+      Select which LFS book version to build from
+
+config LFS_12_4_SYSV
+    bool "LFS 12.4 SysV"
+    help
+      Linux From Scratch version 12.4 with SysV init system
+
+endchoice
+
+config LFS_TARGET
+    string "Target Architecture"
+    default "x86_64-lfs-linux-gnu"
+    help
+      Target triplet for the LFS system
+
+endmenu
+
+menu "Build Settings"
+
+config LFS_MOUNT
+    string "LFS Build Directory"
+    default "/mnt/lfs"
+    help
+      Directory where LFS will be built.
+      Can be a mounted partition (/mnt/lfs) or any directory (~/lfs-build).
+      Must have at least 10GB free space and be writable.
+
+config CORES
+    int "CPU Cores"
+    default 1
+    help
+      Number of CPU cores available on your system
+
+config MAKE_JOBS
+    int "Parallel Jobs"
+    default 1
+    help
+      Number of parallel compilation jobs.
+      Set this to your CPU core count for faster builds.
+      Using 1 is safer but slower.
+
+config STRIP_BINARIES
+    bool "Strip Debug Symbols"
+    default n
+    help
+      Remove debug symbols from binaries to save disk space
+
+endmenu
+
+menu "Package Selection"
+
+config BUILD_OPTIONAL
+    bool "Build Optional Packages"
+    default n
+    help
+      Include additional packages beyond base LFS
+
+endmenu
