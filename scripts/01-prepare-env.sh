@@ -11,7 +11,7 @@ fi
 
 source "$PROJECT_ROOT/.config"
 
-LFS=$CONFIG_LFS_MOUNT
+LFS=$(eval echo $CONFIG_LFS_MOUNT)
 
 head "Preparing LFS Build Directory"
 echo ""
@@ -29,8 +29,12 @@ elif [ -d "$LFS" ] && [ ! "$(ls -A $LFS)" ]; then
     if [[ "$answer" =~ ^[Yy]$ ]]; then
         prom "Enter partition (e.g., /dev/sda3):"
         read partition
-        sudo mount -v -t ext4 "$partition" "$LFS" || { echo "$FAIL Mount failed"; exit 1; }
-        echo "$PASS Partition mounted"
+        if sudo mount -v -t ext4 "$partition" "$LFS"; then
+            echo "$PASS Partition mounted"
+        else
+            echo "$FAIL Failed to mount $partition to $LFS"
+            exit 1
+        fi
     fi
     
 elif [ ! -d "$LFS" ]; then
@@ -38,27 +42,43 @@ elif [ ! -d "$LFS" ]; then
     prom "Create directory? [y/N]:"
     read answer
     if [[ "$answer" =~ ^[Yy]$ ]]; then
-        sudo mkdir -pv "$LFS" || { echo "$FAIL Could not create directory"; exit 1; }
-        echo "$PASS Directory created"
+        if sudo mkdir -pv "$LFS"; then
+            echo "$PASS Directory created"
+        else
+            echo "$FAIL Failed to create directory $LFS"
+            exit 1
+        fi
         
         prom "Do you want to mount a partition here? [y/N]:"
         read answer2
         if [[ "$answer2" =~ ^[Yy]$ ]]; then
             prom "Enter partition (e.g., /dev/sda3):"
             read partition
-            sudo mount -v -t ext4 "$partition" "$LFS" || { echo "$FAIL Mount failed"; exit 1; }
-            echo "$PASS Partition mounted"
+            if sudo mount -v -t ext4 "$partition" "$LFS"; then
+                echo "$PASS Partition mounted"
+            else
+                echo "$FAIL Failed to mount $partition to $LFS"
+                exit 1
+            fi
         fi
     else
-        echo "$FAIL Aborted"
+        echo "$FAIL Aborted by user"
         exit 1
     fi
 fi
 
 proc "Setting ownership and permissions..."
-sudo chown root:root "$LFS"
-sudo chmod 755 "$LFS"
-echo "$PASS Ownership set to root:root, permissions 755"
+if sudo chown root:root "$LFS"; then
+    if sudo chmod 755 "$LFS"; then
+        echo "$PASS Ownership set to root:root, permissions 755"
+    else
+        echo "$FAIL Failed to set permissions on $LFS"
+        exit 1
+    fi
+else
+    echo "$FAIL Failed to change ownership of $LFS"
+    exit 1
+fi
 
 proc "Checking mount options..."
 if mount | grep "$LFS" | grep -q "nosuid\|nodev"; then
@@ -78,18 +98,30 @@ fi
 
 proc "Setting \$LFS environment variable..."
 export LFS="$LFS"
-echo "export LFS=$LFS" > "$PROJECT_ROOT/.lfs_env"
-echo "$PASS \$LFS set to $LFS"
+if echo "export LFS=$LFS" > "$PROJECT_ROOT/.lfs_env"; then
+    echo "$PASS \$LFS set to $LFS"
+else
+    echo "$FAIL Failed to write to .lfs_env"
+    exit 1
+fi
 
 proc "Setting umask to 022..."
 umask 022
-echo "umask 022" >> "$PROJECT_ROOT/.lfs_env"
-echo "$PASS umask set"
+if echo "umask 022" >> "$PROJECT_ROOT/.lfs_env"; then
+    echo "$PASS umask set"
+else
+    echo "$FAIL Failed to write umask to .lfs_env"
+    exit 1
+fi
 
 echo ""
 head "Build directory ready"
 echo ""
 echo "$WARN You must load the environment variables before continuing!"
+
+CURRENT_DIR=$(pwd)
+REL_PATH=$(realpath --relative-to="$CURRENT_DIR" "$PROJECT_ROOT/.lfs_env")
+
 text "Run these commands:"
-text "  source ../.lfs_env"
-text "  echo \$LFS  # Verify it shows: $LFS"
+text "  source $REL_PATH"
+text "  echo \$LFS  # Should show your build directory path"
